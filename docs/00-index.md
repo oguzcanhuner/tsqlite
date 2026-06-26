@@ -1,9 +1,9 @@
 # SQLite Clone — Practical Reference
 
 A distilled, language-agnostic reference for building a minimal SQLite clone from
-scratch. The docs are organized to mirror the project roadmap and, above all, to
-support **incremental verification**: at each stage there is something you can
-check at the CLI, long before the whole thing is finished.
+scratch. The docs are organized to mirror the [project roadmap](roadmap.md) and,
+above all, to support **incremental verification**: at each stage there is
+something you can check at the CLI, long before the whole thing is finished.
 
 ## Two kinds of content
 

@@ -1,69 +1,50 @@
 # SQLite Clone in TypeScript
 
-A minimal SQLite implementation, built from scratch to learn TypeScript and
-database internals.
+A minimal SQLite implementation, built from scratch in TypeScript to learn how a
+real database works under the hood.
 
-See [`docs/`](docs/00-index.md) for a language-agnostic reference on the SQLite
-file format and the (toy) query engine, organized to mirror this roadmap.
+> **This is a learning project.** It is not production software and makes no
+> attempt to be complete, fast, or safe. The goal is understanding: by
+> reimplementing SQLite's on-disk format and a toy query engine by hand, you see
+> exactly how bytes on disk become tables, rows, and query results.
 
-## Strategy
+## Aims
 
-- Build in the order below — each item is a **verifiable CLI checkpoint**, not just
-  a feature. Use the real `sqlite3` (and `EXPLAIN QUERY PLAN`) as an oracle: the
-  clone must agree with it.
-- Study the relevant `docs/` page first, implement, then verify at the CLI.
+- **Understand database internals.** Read and write the real sqlite file format -
+  the database header, fixed-size pages, b-trees, cells, the record format,
+  overflow pages - and build a small query engine on top (parsing, planning,
+  execution).
+- **Verify against the real thing.** Build a CLI and use it with a real sqlite database dump to verify that it adheres to the spec.
 
-## Roadmap
+## Using this for your own learning
 
-### Reading (query an existing database)
+You're welcome to use this repo to learn the same things:
 
-- [ ] **CLI scaffold** — accept a db path + a query/command, print output.
-- [ ] **Parse database header** → *checkpoint:* print page size; matches `.dbinfo`.
-- [ ] **Decode varints** (unit-testable; everything downstream needs it).
-- [ ] Parse b-tree page headers (leaf + interior).
-- [ ] Parse cells (table/index, leaf/interior).
-- [ ] Decode the record format (serial types → column values).
-- [ ] **Read the schema table** → *checkpoint:* list tables; matches `.tables`.
-- [ ] **Traverse table b-trees** → *checkpoint:* `SELECT * FROM t`; row count and
-      sample rows match `sqlite3`. *(The big one.)*
-- [ ] Recover column names from the schema `sql` text.
-- [ ] Reconstruct large records via overflow pages → *checkpoint:* long values not
-      truncated.
-- [ ] **`WHERE` filtering** → *checkpoint:* result set matches `sqlite3`.
-- [ ] Parse indexes; **use indexes for lookups** → *checkpoint:* same results as a
-      full scan, fewer pages read.
+- The docs directory contains a number of ai-generated documents which distill the sqlite spec (with worked examples). I find this kind of compact format easiest to learn from. Use these to guide your build.
+- I will heavily comment code as I go along. If you become stuck, feel free to look at how I handled it.
+- Use AI to ask questions and critique your solutions. Avoid the temptation to get it to write the code for you - your learning will be less effective.
 
-### Writing (create and mutate databases)
+The docs are language-agnostic, so they work just as well if you'd rather
+implement your own version in another language.
 
-- [ ] **Create an empty database** (header + empty root page) → *checkpoint:* real
-      `sqlite3` opens it cleanly.
-- [ ] Encode records and cells (the inverse of reading; round-trip unit test).
-- [ ] **Insert a row** (append a cell to a leaf page) → *checkpoint:* read it back;
-      `sqlite3` sees it.
-- [ ] Freelist: track and reuse freed pages.
-- [ ] **Page splitting** (and tree growth) → *checkpoint:* insert enough rows to
-      force a split; all rows still read correctly.
-- [ ] **Update / delete rows** → *checkpoint:* changes visible; space reused.
-- [ ] **`CREATE TABLE` / `CREATE INDEX`** → *checkpoint:* `.schema` shows the table.
+## Why Typescript
 
-### Advanced (the query engine & durability)
+It's not an obvious choice for building a database, but it _is_ a language that
+many people already know. It's also a high level language, so it should make it
+easier to understand.
 
-- [ ] **Real SQL parser** (tokenizer + AST) — replace whitespace-splitting;
-      handles quoted strings, expressions, commas, parens.
-- [ ] Expression evaluation (powers `WHERE`, with NULL/three-valued logic).
-- [ ] **Query planning** — choose index vs scan → *verify against*
-      `EXPLAIN QUERY PLAN`.
-- [ ] `JOIN` queries (nested-loop, then index-assisted).
-- [ ] Aggregations (`COUNT`, `SUM`, ...) and `GROUP BY` / `HAVING`.
-- [ ] `ORDER BY` / `LIMIT`.
-- [ ] Multi-column indexes.
-- [ ] **Transactions** (rollback journal) → *checkpoint:* an aborted write leaves
-      the database unchanged after reopen. *(Stretch: WAL.)*
+## Getting started
 
-## Docs map
+Clone the project and then
 
-| Phase | Docs |
-|-------|------|
-| Reading | [`docs/reading/`](docs/00-index.md) |
-| Writing | [`docs/writing/`](docs/00-index.md) |
-| Advanced | [`docs/advanced/`](docs/00-index.md) |
+```sh
+npm install      # install dependencies
+npm run build    # compile TypeScript to dist/
+npm test         # build, then run the test suite
+```
+
+## Contributing
+
+Any improvements are welcome. For all contributions (code, comment or documentation),
+the important thing is that changes should improve the ability to understand. It
+doesn't need to be performant, scalable etc.
