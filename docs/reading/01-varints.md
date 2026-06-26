@@ -10,6 +10,118 @@ The idea: most numbers in a database are small, so spending a fixed 8 bytes on
 every integer would waste enormous space. A varint costs 1 byte for values up to
 127, and only grows as needed (up to 9 bytes for a full 64-bit value).
 
+## Bits and bytes — how to think about them
+
+Varints are all about manipulating individual bits, so it's worth being completely
+fluent in what bits and bytes actually are.
+
+### A bit
+
+A **bit** is the smallest unit of information: a single 0 or 1. That's it. Every
+piece of data in a computer is ultimately a pattern of bits.
+
+### A byte
+
+A **byte** is a group of **8 bits** in a row, e.g. `1000 0010`. (The space in the
+middle is just for readability — it groups the 8 bits into two nibbles of 4.)
+
+Because each of the 8 positions is independently 0 or 1, a byte has
+`2 × 2 × 2 × 2 × 2 × 2 × 2 × 2 = 2^8 = 256` possible patterns. Read as a plain
+unsigned number, those patterns represent the integers **0 to 255**:
+
+```
+0000 0000 = 0      (all bits off)
+0000 0001 = 1
+0000 0010 = 2
+...
+1111 1111 = 255    (all bits on)
+```
+
+### How a byte's bits map to a number (place values)
+
+A byte is just a number written in **base 2 (binary)**. In our everyday base 10,
+each digit's place is worth a power of ten (1, 10, 100, ...). In binary, each
+position is worth a power of **two**, doubling as you move left:
+
+```
+position:   7    6    5    4    3    2    1    0     <- "bit number"
+value:    128   64   32   16    8    4    2    1     <- what a 1 here is worth
+```
+
+To find the number a byte represents, add up the place values wherever there's a 1:
+
+```
+1000 0010
+│       └─ position 1, value 2  -> on
+└───────── position 7, value 128 -> on
+= 128 + 2 = 130
+```
+
+So the byte `1000 0010` is the number 130. (The bits that are 0 contribute
+nothing.)
+
+### Bit numbering: "high" vs "low"
+
+Bits are numbered **0 to 7, from right to left**, by their place value:
+
+- **Bit 0** is the **rightmost** bit, worth 1. It's the **least significant bit**
+  (changing it changes the number the least).
+- **Bit 7** is the **leftmost** bit, worth 128. It's the **most significant bit**,
+  often called the **high bit** (changing it changes the number the most).
+
+Varints reserve the **high bit (bit 7)** as a special flag and use the other seven
+bits (bits 0–6) for actual data. Keeping "high = leftmost = worth 128" straight is
+most of what makes varints click.
+
+### Hexadecimal: a shorthand for bytes
+
+Writing `1000 0010` everywhere is tedious, so bytes are usually written in
+**hexadecimal (base 16)**, prefixed with `0x`. Hex is convenient because **one hex
+digit is exactly 4 bits** (a nibble), so **two hex digits = one byte**:
+
+```
+binary nibble -> hex digit
+0000 = 0      1000 = 8
+0001 = 1      1001 = 9
+0010 = 2      1010 = a (10)
+0011 = 3      1011 = b (11)
+0100 = 4      1100 = c (12)
+0101 = 5      1101 = d (13)
+0110 = 6      1110 = e (14)
+0111 = 7      1111 = f (15)
+```
+
+So the byte `1000 0010` splits into nibbles `1000` and `0010` = hex `8` and `2` =
+**`0x82`**. And indeed `0x82` = `8 × 16 + 2` = 130, matching the place-value sum
+above. The three notations are the same byte:
+
+```
+binary  1000 0010
+hex     0x82
+decimal 130
+```
+
+### Reading order within a number (endianness, briefly)
+
+Within a single byte, the leftmost bit is the most significant. When a number
+spans **several** bytes, there's a second question: does the first byte hold the
+most significant part or the least? "Most significant first" is called
+**big-endian**. SQLite (and varints) are big-endian: the first byte/group carries
+the largest part of the value. (More on this where it matters; just know the term.)
+
+### Why this matters for varints
+
+Everything a varint does is bit-level:
+
+- **"Is the high bit set?"** = is bit 7 (the leftmost, worth 128) a 1? That's the
+  continuation flag.
+- **"The low 7 data bits"** = bits 0–6, the value once you ignore the high bit.
+- **"Shift left by 7 and combine"** = make room for the next 7 data bits and merge
+  them in, building the full number group by group.
+
+With bits and bytes clear, the encoding rules below are just precise statements of
+those three ideas.
+
 ## The encoding rules
 
 - A varint is **1 to 9 bytes** long, **big-endian** (most significant group first).

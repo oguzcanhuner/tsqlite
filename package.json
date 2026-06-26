@@ -1,7 +1,8 @@
 {
   "type": "module",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test": "tsc && node --test-reporter=spec --test 'dist/**/*.test.js'"
   },
   "dependencies": {
     "typescript": "^6.0.3"
