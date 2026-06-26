@@ -41,7 +41,49 @@ are marked. Offsets are from the start of the file.
 | 92 | 4  | Version-valid-for number. |
 | 96 | 4  | `SQLITE_VERSION_NUMBER` of the library that last wrote the file. |
 
+## The page size, and why it matters
+
+A SQLite database file is not read or written as one continuous stream of bytes.
+Instead, the whole file is divided into equal-sized chunks called **pages**, and
+the **page size** is the length (in bytes) of each one. Every page in a given
+database is exactly the same size, fixed at creation time and recorded here in the
+header.
+
+The page is the fundamental unit of the format. Almost everything else is built on
+top of it:
+
+- **It is the unit of I/O.** SQLite reads and writes whole pages at a time, never
+  individual bytes. This maps well onto how operating systems and disks move data
+  in fixed-size blocks, which is why the page size is always a power of two
+  (512..65536) — typically 4096.
+- **It defines where each page lives in the file.** Pages are numbered from 1, and
+  page *N* starts at byte offset `(N - 1) * page_size`. So as soon as you know the
+  page size, you can jump straight to any page:
+
+  ```
+  page 1 -> offset 0
+  page 2 -> offset page_size
+  page 3 -> offset 2 * page_size
+  ...
+  ```
+
+- **It bounds how much data fits in one place.** A b-tree node, the cells on it,
+  and the records inside them all have to fit within a single page. When they
+  don't, the format needs extra machinery (page splitting, overflow pages) — so
+  the page size quietly shapes much of the rest of the design.
+
+This is why the page size is the *first* thing you parse: you cannot locate page 2,
+walk a b-tree, or read a record until you know how big a page is. It is the key
+that unlocks the rest of the file.
+
+> **Reading it is your first verifiable checkpoint.** Decode the page size and
+> compare it against `sqlite3 yourdb '.dbinfo'`, which prints the same value.
+
 ## Worked example: reading the page size
+
+The page size lives at **offset 16, as a 2-byte big-endian integer** (it is *not* a
+varint — header fields are all fixed-width; varints only appear later, in cells and
+records).
 
 Suppose bytes 16 and 17 of the file are `0x04 0x00`.
 
@@ -79,12 +121,6 @@ This is a cheap, useful sanity check at startup.
   the file length (`file_size / page_size`) is often simpler and safe for reading.
 - **Text encoding affects how you decode text values** later (offset 56). Most
   databases are UTF-8; do not assume it blindly if you want full correctness.
-
-## Relevant tasks
-
-- Parse database header (read path).
-- Create new database file / write header (write path) — you will need most of
-  these fields, not just the page size.
 
 ## References
 
